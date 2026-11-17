@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Receipt + Fit!</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        parchment: '#f5f5f7',
+                        canvas: '#ffffff',
+                        ink: '#1d1d1f',
+                        muted: '#7a7a7a',
+                        action: '#0066cc',
+                        hairline: '#e0e0e0',
+                        black: '#000000',
+                        red: '#ff3b30'
+                    },
+                    fontFamily: {
+                        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    },
+                    fontSize: {
+                        nav: ['12px', { lineHeight: '1.0', letterSpacing: '-0.12px', fontWeight: '400' }],
+                        caption: ['14px', { lineHeight: '1.29', letterSpacing: '-0.224px', fontWeight: '400' }],
+                        body: ['17px', { lineHeight: '1.47', letterSpacing: '-0.374px', fontWeight: '400' }],
+                        strong: ['17px', { lineHeight: '1.24', letterSpacing: '-0.374px', fontWeight: '600' }],
+                        tagline: ['21px', { lineHeight: '1.19', letterSpacing: '0.231px', fontWeight: '600' }],
+                        display: ['34px', { lineHeight: '1.1', letterSpacing: '-0.374px', fontWeight: '600' }],
+                        hero: ['40px', { lineHeight: '1.1', letterSpacing: '-0.28px', fontWeight: '600' }],
+                    },
+                    borderRadius: {
+                        apple: '18px',
+                        pill: '9999px'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .view { display: none; }
+        .view.active { display: block; animation: fade 0.25s ease-out forwards; }
+        @keyframes fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .frosted {
+            background-color: rgba(245, 245, 247, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        input:focus, select:focus { outline: none; }
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="font-sans text-body select-none">
+
+    <!-- App Container -->
+    <main class="max-w-[414px] mx-auto min-h-screen bg-parchment relative pb-[120px]">
+        
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboard-view" class="view active">
+            <div class="h-[52px] frosted sticky top-0 z-40 border-b border-hairline flex items-center justify-between px-6">
+                <h1 class="text-tagline">レシピート</h1>
+                <button onclick="navTo('history-view')" class="text-action text-caption font-medium">
+                    履歴一覧 (History)
+                </button>
+            </div>
+
+            <div class="px-6 py-8 text-center">
+                <p class="text-strong text-muted mb-2">総支出 (Total Expenses)</p>
+                <h2 class="text-hero tracking-tighter" id="dash-total">₩0</h2>
+                <p class="text-tagline text-muted mt-2" id="dash-total-jpy">≈ ¥0</p>
+                <p class="text-nav text-muted mt-2">各支出を決済日の為替レートで円換算 (ECB基準)</p>
+                <p class="text-nav text-muted mt-1" id="dash-today-rate"></p>
+            </div>
+
+            <div class="px-6 space-y-4 mb-6">
+                <div class="bg-canvas border border-hairline rounded-apple p-[24px]">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-strong">現金</span>
+                        <span class="text-body text-muted">Cash</span>
+                    </div>
+                    <div class="text-display" id="dash-cash">₩0</div>
+                    <div class="text-body text-muted" id="dash-cash-jpy">≈ ¥0</div>
+                </div>
+
+                <div class="bg-canvas border border-hairline rounded-apple p-[24px]">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-strong">WOWPASS</span>
+                        <span class="text-body text-muted">Prepaid</span>
+                    </div>
+                    <div class="text-display" id="dash-wowpass">₩0</div>
+                    <div class="text-body text-muted" id="dash-wowpass-jpy">≈ ¥0</div>
+                </div>
+
+                <div class="bg-canvas border border-hairline rounded-apple p-[24px]">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-strong">クレジットカード</span>
+                        <span class="text-body text-muted">Credit Card</span>
+                    </div>
+                    <div class="text-display" id="dash-card">₩0</div>
+                    <div class="text-body text-muted" id="dash-card-jpy">≈ ¥0</div>
+                </div>
+            </div>
+
+            <!-- Categories Summary Section -->
+            <div class="px-6">
+                <h3 class="text-strong mb-3">カテゴリー別支出 (Categories)</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-canvas border border-hairline rounded-apple p-4">
+                        <p class="text-caption text-muted">음식 (食事)</p>
+                        <p class="text-strong text-lg mt-1" id="cat-food">₩0</p>
+                        <p class="text-caption text-muted" id="cat-food-jpy">≈ ¥0</p>
+                    </div>
+                    <div class="bg-canvas border border-hairline rounded-apple p-4">
+                        <p class="text-caption text-muted">쇼핑 (ショッピング)</p>
+                        <p class="text-strong text-lg mt-1" id="cat-shopping">₩0</p>
+                        <p class="text-caption text-muted" id="cat-shopping-jpy">≈ ¥0</p>
+                    </div>
+                    <div class="bg-canvas border border-hairline rounded-apple p-4">
+                        <p class="text-caption text-muted">교통비 (交通)</p>
+                        <p class="text-strong text-lg mt-1" id="cat-transport">₩0</p>
+                        <p class="text-caption text-muted" id="cat-transport-jpy">≈ ¥0</p>
+                    </div>
+                    <div class="bg-canvas border border-hairline rounded-apple p-4">
+                        <p class="text-caption text-muted">숙박 (宿泊)</p>
+                        <p class="text-strong text-lg mt-1" id="cat-accommodation">₩0</p>
+                        <p class="text-caption text-muted" id="cat-accommodation-jpy">≈ ¥0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fixed bottom-0 left-0 right-0 frosted border-t border-hairline py-4 px-6 flex justify-center z-40 max-w-[414px] mx-auto">
+                <button onclick="navTo('scan-view')" class="bg-action text-white rounded-pill px-[22px] py-[11px] text-body active:scale-95 transition-transform duration-100 shadow-sm w-full font-medium">
+                    レシート撮影 (Scan Receipt)
+                </button>
+            </div>
+        </div>
+
+        <!-- SCAN VIEW (wireframe: ← 나가기 / 촬영 화면 / 영수증 스캔) -->
+        <div id="scan-view" class="view">
+            <div class="h-[52px] frosted sticky top-0 z-40 border-b border-hairline flex items-center px-4">
+                <button onclick="navTo('dashboard-view')" class="text-action text-body active:opacity-50 transition-opacity">
+                    <span class="mr-1">‹</span>閉じる
+                </button>
+                <h1 class="text-tagline mx-auto pr-8">レシート撮影</h1>
+            </div>
+
+            <div class="px-6 pt-6 pb-8 flex flex-col items-center">
+                <!-- 撮影画面 -->
+                <div class="w-full aspect-[3/4] bg-black rounded-apple flex items-center justify-center relative overflow-hidden">
+                    <video id="camera-feed" class="absolute inset-0 w-full h-full object-cover z-0" autoplay playsinline muted></video>
+                    <img id="scan-preview" class="absolute inset-0 w-full h-full object-contain bg-black z-[5] hidden" alt="">
+                    <canvas id="camera-canvas" class="hidden"></canvas>
+
+                    <div id="camera-flash" class="absolute inset-0 bg-white opacity-0 pointer-events-none z-20 transition-opacity duration-75"></div>
+
+                    <div id="scan-loading-overlay" class="absolute inset-0 bg-white/90 hidden flex-col items-center justify-center z-30 transition-opacity duration-300 opacity-0 px-8">
+                        <svg class="animate-spin h-8 w-8 text-black mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="text-caption text-ink font-medium text-center" id="scan-status">レシートを分析中...</p>
+                        <div class="w-full h-1 bg-hairline rounded-full mt-4 overflow-hidden">
+                            <div id="scan-progress" class="h-full bg-action transition-all duration-300" style="width: 5%"></div>
+                        </div>
+                    </div>
+
+                    <!-- ガイド枠 -->
+                    <div class="absolute top-5 left-5 w-7 h-7 border-t-2 border-l-2 border-white opacity-90 z-10"></div>
+                    <div class="absolute top-5 right-5 w-7 h-7 border-t-2 border-r-2 border-white opacity-90 z-10"></div>
+                    <div class="absolute bottom-5 left-5 w-7 h-7 border-b-2 border-l-2 border-white opacity-90 z-10"></div>
+                    <div class="absolute bottom-5 right-5 w-7 h-7 border-b-2 border-r-2 border-white opacity-90 z-10"></div>
+
+                    <div id="camera-overlay-text" class="absolute inset-x-0 bottom-12 flex justify-center pointer-events-none z-10">
+                        <p class="text-caption text-white text-center px-4 py-1 rounded-pill bg-black/40 font-medium">
+                            レシート全体を枠に合わせてください
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 영수증 스캔 -->
+                <button id="scan-button" onclick="captureAndScan()" class="mt-8 bg-action text-white rounded-pill px-10 py-[13px] text-body active:scale-95 transition-transform duration-100 font-medium shadow-sm">
+                    レシートをスキャン
+                </button>
+
+                <button onclick="document.getElementById('file-gallery').click()" class="mt-5 text-caption text-action active:opacity-50">写真から選ぶ</button>
+                <p class="text-nav text-muted mt-4 text-center leading-relaxed">
+                    きれいに読むコツ: 明るい場所で・影を作らず・<br>レシートを平らにして縦向きで撮影
+                </p>
+
+                <!-- カメラが使えない環境(HTTP等)用: OS標準カメラで撮影 -->
+                <input type="file" id="file-camera" accept="image/*" capture="environment" class="hidden" onchange="handleImageFile(this)">
+                <input type="file" id="file-gallery" accept="image/*" class="hidden" onchange="handleImageFile(this)">
+            </div>
+        </div>
+
+        <!-- PAYMENT VIEW -->
+        <div id="payment-view" class="view">
+            <div class="h-[52px] frosted sticky top-0 z-40 border-b border-hairline flex items-center px-4">
+                <button onclick="navTo('scan-view')" class="text-action text-body active:opacity-50 transition-opacity">
+                    <span class="mr-1">‹</span>戻る
+                </button>
+                <h1 class="text-tagline mx-auto pr-8">支払い方法</h1>
+            </div>
+
+            <div class="px-6 py-8">
+                <div class="mb-8 text-center">
+                    <p class="text-body text-muted mb-1" id="payment-store-name">ソウルカフェ</p>
+                    <h2 class="text-display" id="payment-total-amount">₩8,000</h2>
+                    <p class="text-tagline text-muted mt-1" id="payment-total-jpy">≈ ¥—</p>
+                    <p class="text-nav text-muted mt-2" id="payment-rate-info">為替レート取得中...</p>
+                    <p class="text-nav text-red mt-2 hidden" id="payment-mock-notice"></p>
+                </div>
+
+                <div class="bg-canvas border border-hairline rounded-apple p-0 overflow-hidden mb-8">
+                    <label class="flex items-center justify-between p-[24px] border-b border-hairline active:bg-parchment transition-colors cursor-pointer">
+                        <span class="text-strong">現金 (Cash)</span>
+                        <div class="w-6 h-6 rounded-full border-2 border-action flex items-center justify-center relative">
+                            <div class="w-3 h-3 bg-action rounded-full" id="radio-cash"></div>
+                        </div>
+                        <input type="radio" name="payment" value="cash" class="hidden" checked onchange="updateRadioUI('cash')">
+                    </label>
+
+                    <label class="flex items-center justify-between p-[24px] border-b border-hairline active:bg-parchment transition-colors cursor-pointer">
+                        <span class="text-strong">WOWPASS</span>
+                        <div class="w-6 h-6 rounded-full border-2 border-hairline flex items-center justify-center relative">
+                            <div class="w-3 h-3 bg-transparent rounded-full" id="radio-wowpass"></div>
+                        </div>
+                        <input type="radio" name="payment" value="wowpass" class="hidden" onchange="updateRadioUI('wowpass')">
+                    </label>
+
+                    <label class="flex items-center justify-between p-[24px] active:bg-parchment transition-colors cursor-pointer">
+                        <span class="text-strong">クレジットカード</span>
+                        <div class="w-6 h-6 rounded-full border-2 border-hairline flex items-center justify-center relative">
+                            <div class="w-3 h-3 bg-transparent rounded-full" id="radio-card"></div>
+                        </div>
+                        <input type="radio" name="payment" value="card" class="hidden" onchange="updateRadioUI('card')">
+                    </label>
+                </div>
+
+                <button onclick="navTo('confirm-view')" class="w-full bg-action text-white rounded-pill px-[22px] py-[11px] text-body active:scale-95 transition-transform duration-100 font-medium block text-center">
+                    保存 (Save)
+                </button>
+            </div>
+        </div>
+
+        <!-- CONFIRM VIEW -->
+        <div id="confirm-view" class="view">
+            <div class="h-[52px] frosted sticky top-0 z-40 border-b border-hairline flex items-center px-4">
+                <button onclick="navTo('payment-view')" class="text-action text-body active:opacity-50 transition-opacity">
+                    <span class="mr-1">‹</span>戻る
+                </button>
+                <h1 class="text-tagline mx-auto pr-8">内容を確認</h1>
+            </div>
+
+            <div class="px-6 py-8">
+                <div id="confirm-receipt-box" class="flex gap-4 items-start mb-4 hidden">
+                    <img id="confirm-receipt-img" class="w-20 h-28 object-cover rounded-lg border border-hairline bg-canvas cursor-zoom-in" alt="" onclick="window.open(this.src)">
+                    <div class="flex-1">
+                        <p class="text-caption text-muted" id="confirm-engine"></p>
+                        <p class="text-caption mt-2 leading-snug" id="confirm-check"></p>
+                    </div>
+                </div>
+                <p id="confirm-notice" class="text-caption text-red mb-4 hidden"></p>
+                <details id="confirm-raw-box" class="mb-4 hidden">
+                    <summary class="text-caption text-action cursor-pointer">読み取った文字を表示</summary>
+                    <pre id="confirm-raw" class="text-nav text-muted whitespace-pre-wrap mt-2 bg-canvas border border-hairline rounded-lg p-3 max-h-60 overflow-auto select-text"></pre>
+                </details>
+                <div class="bg-canvas border border-hairline rounded-apple p-[24px] mb-8">
+                    <div class="flex items-center border-b border-hairline py-4 first:pt-0">
+                        <div class="w-1/3 text-muted text-body">日付</div>
+                        <input type="text" id="confirm-date" oninput="refreshConfirmYen()" class="w-2/3 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action transition-colors" value="2026.11.03">
+                    </div>
+
+                    <div class="flex items-center border-b border-hairline py-4">
+                        <div class="w-1/3 text-muted text-body">店舗</div>
+                        <input type="text" id="confirm-store" class="w-2/3 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action transition-colors" value="ソウルカフェ">
+                    </div>
+
+                    <div class="flex items-center border-b border-hairline py-4">
+                        <div class="w-1/3 text-muted text-body">カテゴリー</div>
+                        <select id="confirm-category" class="w-2/3 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action transition-colors">
+                            <option value="음식">음식 (食事)</option>
+                            <option value="쇼핑">쇼핑 (ショッピング)</option>
+                            <option value="교통비">교통비 (交通)</option>
+                            <option value="숙박">숙박 (宿泊)</option>
+                        </select>
+                    </div>
+
+                    <div class="py-4 border-b border-hairline">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="text-muted text-body">明細</span>
+                            <span class="text-nav text-muted">品名 · 数量 · 金額</span>
+                        </div>
+                        <div id="confirm-items-container" class="space-y-3"></div>
+                        <button onclick="addItemRow()" class="text-caption text-action mt-3 active:opacity-50">＋ 行を追加</button>
+                    </div>
+
+                    <div class="py-4 border-b border-hairline">
+                        <div class="text-muted text-body mb-3">小計 (소계)</div>
+                        <div id="confirm-subtotals-container" class="space-y-2"></div>
+                        <button onclick="addSubtotalRow()" class="text-caption text-action mt-3 active:opacity-50">＋ 小計を追加</button>
+                    </div>
+
+                    <div class="flex items-center border-b border-hairline py-3">
+                        <div class="w-1/2 text-muted text-body">割引 (할인)</div>
+                        <input type="number" id="confirm-discount" oninput="updateConfirmCheck()" class="w-1/2 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action" placeholder="0">
+                    </div>
+                    <div class="flex items-center border-b border-hairline py-3">
+                        <div class="w-1/2 text-muted text-body">うち税 (부가세)</div>
+                        <input type="number" id="confirm-tax" oninput="updateConfirmCheck()" class="w-1/2 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action" placeholder="0">
+                    </div>
+
+                    <div class="flex justify-between items-center pt-6 pb-2">
+                        <div class="text-strong">合計 (₩)</div>
+                        <input type="number" id="confirm-total" oninput="refreshConfirmYen(); updateConfirmCheck()" class="text-display bg-transparent border-none outline-none text-right focus:text-action transition-colors w-1/2" value="8000">
+                    </div>
+                    <div class="text-right">
+                        <p class="text-tagline text-muted" id="confirm-total-jpy">≈ ¥—</p>
+                        <p class="text-nav text-muted mt-1" id="confirm-rate-info"></p>
+                    </div>
+                </div>
+
+                <button onclick="finalizeTransaction()" class="w-full bg-action text-white rounded-pill px-[22px] py-[11px] text-body active:scale-95 transition-transform duration-100 font-medium block text-center">
+                    次へ (Next)
+                </button>
+            </div>
+        </div>
+
+        <!-- HISTORY VIEW -->
+        <div id="history-view" class="view">
+            <div class="h-[52px] frosted sticky top-0 z-40 border-b border-hairline flex items-center px-4">
+                <button onclick="navTo('dashboard-view')" class="text-action text-body active:opacity-50 transition-opacity">
+                    <span class="mr-1">‹</span>戻る
+                </button>
+                <h1 class="text-tagline mx-auto pr-8">支出履歴一覧</h1>
+            </div>
+
+            <div class="px-6 py-8">
+                <div id="history-list-container" class="space-y-4">
+                    <!-- Dynamic History Cards -->
+                </div>
+                <div id="history-empty" class="text-center py-16 text-muted text-body hidden">
+                    記録された支出がありません。
+                </div>
+                <button onclick="if (confirm('すべての履歴を削除しますか？')) resetAllData()" class="w-full mt-8 text-caption text-red active:opacity-50">
+                    すべての履歴を削除 (Reset)
+                </button>
+            </div>
+        </div>
+
+        <!-- EDIT VIEW -->
+        <div id="edit-view" class="view">
+            <div class="h-[52px] frosted sticky top-0 z-40 border-b border-hairline flex items-center px-4">
+                <button onclick="navTo('history-view')" class="text-action text-body active:opacity-50 transition-opacity">
+                    <span class="mr-1">‹</span>戻る
+                </button>
+                <h1 class="text-tagline mx-auto pr-8">履歴を編集</h1>
+            </div>
+
+            <div class="px-6 py-8">
+                <div class="bg-canvas border border-hairline rounded-apple p-[24px] mb-8">
+                    <input type="hidden" id="edit-index">
+                    <div class="flex items-center border-b border-hairline py-4 first:pt-0">
+                        <div class="w-1/3 text-muted text-body">日付</div>
+                        <input type="text" id="edit-date" oninput="refreshEditYen()" class="w-2/3 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action transition-colors">
+                    </div>
+
+                    <div class="flex items-center border-b border-hairline py-4">
+                        <div class="w-1/3 text-muted text-body">店舗</div>
+                        <input type="text" id="edit-store" class="w-2/3 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action transition-colors">
+                    </div>
+
+                    <div class="flex items-center border-b border-hairline py-4">
+                        <div class="w-1/3 text-muted text-body">支払い方法</div>
+                        <select id="edit-method" class="w-2/3 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action transition-colors">
+                            <option value="cash">現金 (Cash)</option>
+                            <option value="wowpass">WOWPASS</option>
+                            <option value="card">クレジットカード</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center border-b border-hairline py-4">
+                        <div class="w-1/3 text-muted text-body">カテゴリー</div>
+                        <select id="edit-category" class="w-2/3 text-body font-medium bg-transparent border-none outline-none text-right focus:text-action transition-colors">
+                            <option value="음식">음식 (食事)</option>
+                            <option value="쇼핑">쇼핑 (ショッピング)</option>
+                            <option value="교통비">교통비 (交通)</option>
+                            <option value="숙박">숙박 (宿泊)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-6 pb-2">
+                        <div class="text-strong">合計 (₩)</div>
+                        <input type="number" id="edit-total" oninput="refreshEditYen()" class="text-display bg-transparent border-none outline-none text-right focus:text-action transition-colors w-1/2">
+                    </div>
+                    <div class="text-right">
+                        <p class="text-tagline text-muted" id="edit-total-jpy">≈ ¥—</p>
+                        <p class="text-nav text-muted mt-1" id="edit-rate-info"></p>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="saveEditedTransaction()" class="w-full bg-action text-white rounded-pill px-[22px] py-[11px] text-body active:scale-95 transition-transform duration-100 font-medium block text-center">
+                        変更を保存 (Save Changes)
+                    </button>
+                    <button onclick="deleteTransaction()" class="w-full bg-canvas border border-red text-red rounded-pill px-[22px] py-[11px] text-body active:scale-95 transition-transform duration-100 font-medium block text-center">
+                        削除 (Delete)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const state = {
+            total: 0,
+            cash: 0,
+            wowpass: 0,
+            card: 0,
+            categories: {
+                음식: 0,
+                쇼핑: 0,
+                교통비: 0,
+                숙박: 0
+            },
+            transactions: [],
+            pendingPaymentMethod: 'cash',
+            currentReceipt: null,
+            cameraStream: null
+        };
+
+        // ===== 為替レート (KRW → JPY) =====
+        // Frankfurter API: 欧州中央銀行(ECB)の参照レート。APIキー不要・CORS対応・過去日付対応。
+        // ※ ECBレートは1営業日に1回(16:00 CET頃)更新。土日・祝日は直前営業日のレート。
+        const RATE_STORE_KEY = 'receiptfit.rates.v1';
+        const TX_STORE_KEY = 'receiptfit.transactions.v1';
+        const RECENT_TTL_MS = 60 * 60 * 1000; // 直近3日以内のレートは1時間ごとに再取得
+
+        // ---- localStorage (使えない環境でも落ちないよう try/catch) ----
+        function storageGet(key, fallback) {
+            try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+            catch (e) { return fallback; }
+        }
+        function storageSet(key, value) {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn('Storage unavailable', e); }
+        }
+
+        const rateCache = storageGet(RATE_STORE_KEY, {}); // { 'YYYY-MM-DD' | 'latest': { rate, rateDate, source, fetchedAt } }
+
+        // "2026.11.03" / "2026-11-03" / "2026/11/3" / "2026年11月3日" / "26.11.03" → "2026-11-03"
+        function normalizeDate(str) {
+            if (!str) return null;
+            const m = String(str).match(/(\d{4}|\d{2})\D+(\d{1,2})\D+(\d{1,2})/);
+            if (!m) return null;
+            const year = m[1].length === 2 ? '20' + m[1] : m[1];
+            const iso = `${year}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+            const d = new Date(iso);
+            return (isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso) ? null : iso;
+        }
+
+        function isoOf(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function todayISO() { return isoOf(new Date()); }
+        function todayDotted() { return todayISO().replace(/-/g, '.'); }
+
+        // キャッシュがまだ使えるか: 古い日付のECBレートは確定値なので永久保存、直近・最新は1時間で失効
+        function isCacheFresh(key, entry) {
+            if (!entry) return false;
+            if (entry.source !== 'ECB') return Date.now() - (entry.fetchedAt || 0) < RECENT_TTL_MS;
+            const threeDaysAgo = isoOf(new Date(Date.now() - 3 * 86400000));
+            if (key !== 'latest' && key < threeDaysAgo) return true;
+            return Date.now() - (entry.fetchedAt || 0) < RECENT_TTL_MS;
+        }
+
+        async function fetchJSON(url) {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+
+        // 決済日のKRW→JPYレートを返す。取得できない場合は null。
+        async function getRateForDate(dateStr) {
+            let key = normalizeDate(dateStr);
+            if (!key || key > todayISO()) key = 'latest'; // 読めない日付・未来日付は最新レート
+            if (isCacheFresh(key, rateCache[key])) return rateCache[key];
+
+            const endpoints = [
+                `https://api.frankfurter.dev/v1/${key}?base=KRW&symbols=JPY`,
+                `https://api.frankfurter.app/${key}?from=KRW&to=JPY`
+            ];
+            for (const url of endpoints) {
+                try {
+                    const data = await fetchJSON(url);
+                    if (data?.rates?.JPY) {
+                        rateCache[key] = { rate: data.rates.JPY, rateDate: data.date, source: 'ECB', fetchedAt: Date.now() };
+                        storageSet(RATE_STORE_KEY, rateCache);
+                        return rateCache[key];
+                    }
+                } catch (e) { console.warn('Rate fetch failed:', url, e); }
+            }
+            // 最終手段: 最新レートのみ (過去日付は取れないので、1時間後に再挑戦する)
+            try {
+                const data = await fetchJSON('https://open.er-api.com/v6/latest/KRW');
+                if (data?.rates?.JPY) {
+                    const rd = isoOf(new Date(data.time_last_update_unix * 1000));
+                    rateCache[key] = { rate: data.rates.JPY, rateDate: rd, source: 'latest', fetchedAt: Date.now() };
+                    storageSet(RATE_STORE_KEY, rateCache);
+                    return rateCache[key];
+                }
+            } catch (e) { console.warn('Fallback rate fetch failed', e); }
+            // 通信できない場合は、古くてもキャッシュがあれば使う
+            return rateCache[key] || null;
+        }
+
+        function formatYen(num) {
+            return '¥' + Math.round(num).toLocaleString('ja-JP');
+        }
+
+        // 例: "₩1,000 = ¥107 (2026-11-03 ECBレート)"
+        function rateLabel(r, requestedDate) {
+            if (!r) return '為替レートを取得できませんでした';
+            if (r.source !== 'ECB') return `₩1,000 = ${formatYen(r.rate * 1000)} (最新レートで代用)`;
+            const req = normalizeDate(requestedDate);
+            const note = (req && req !== r.rateDate) ? `${r.rateDate} 営業日のレートを適用` : `${r.rateDate} ECBレート`;
+            return `₩1,000 = ${formatYen(r.rate * 1000)} (${note})`;
+        }
+
+        // 連続入力時、古い通信結果が新しい結果を上書きしないよう要素ごとに番号を振る
+        const yenRequestSeq = {};
+        async function showYen(totalKrw, dateStr, yenElId, infoElId) {
+            const seq = (yenRequestSeq[yenElId] = (yenRequestSeq[yenElId] || 0) + 1);
+            document.getElementById(infoElId).innerText = '為替レート取得中...';
+            const r = await getRateForDate(dateStr);
+            if (seq !== yenRequestSeq[yenElId]) return r; // 新しいリクエストがある
+            document.getElementById(yenElId).innerText = r ? `≈ ${formatYen(totalKrw * r.rate)}` : '≈ ¥—';
+            document.getElementById(infoElId).innerText = rateLabel(r, dateStr);
+            return r;
+        }
+
+        // 入力中は少し待ってから更新 (1文字ごとに通信しない)
+        const debounceTimers = {};
+        function debounce(id, fn, ms = 400) {
+            clearTimeout(debounceTimers[id]);
+            debounceTimers[id] = setTimeout(fn, ms);
+        }
+
+        function refreshConfirmYen() {
+            debounce('confirm', () => {
+                const total = parseInt(document.getElementById('confirm-total').value, 10) || 0;
+                showYen(total, document.getElementById('confirm-date').value, 'confirm-total-jpy', 'confirm-rate-info');
+            });
+        }
+
+        function refreshEditYen() {
+            debounce('edit', () => {
+                const total = parseInt(document.getElementById('edit-total').value, 10) || 0;
+                showYen(total, document.getElementById('edit-date').value, 'edit-total-jpy', 'edit-rate-info');
+            });
+        }
+
+        // 取引に決済日レートを付与
+        async function attachRate(tx) {
+            const r = await getRateForDate(tx.date);
+            tx.rate = r ? r.rate : null;
+            tx.rateDate = r ? r.rateDate : null;
+            tx.rateSource = r ? r.source : null;
+            tx.jpy = r ? Math.round(tx.total * r.rate) : null;
+            return tx;
+        }
+
+        // ---- 取引履歴の保存・復元 ----
+        function saveTransactions() {
+            storageSet(TX_STORE_KEY, state.transactions);
+        }
+
+        async function loadTransactions() {
+            state.transactions = storageGet(TX_STORE_KEY, []);
+            recalculateTotals();
+            // 前回レート取得に失敗した／最新レートで代用した取引は、決済日レートで再計算を試みる
+            const pending = state.transactions.filter(tx => tx.jpy == null || tx.rateSource !== 'ECB');
+            if (pending.length === 0) return;
+            await Promise.all(pending.map(attachRate));
+            saveTransactions();
+            recalculateTotals();
+        }
+
+        async function updateTodayRate() {
+            const r = await getRateForDate('latest');
+            const el = document.getElementById('dash-today-rate');
+            if (el) el.innerText = r ? `今日の参考レート: ${rateLabel(r)}` : '';
+        }
+
+        function resetAllData() {
+            if (!state.transactions.length) return;
+            state.transactions = [];
+            saveTransactions();
+            recalculateTotals();
+            renderHistoryList();
+        }
+
+        // =====================================================================
+        // レシート読み取り (端末内OCR: Tesseract.js / 無料・APIキー不要)
+        //   撮影 → 画像の前処理 (レシート部分の切り出し・白黒化) → 文字認識
+        //   → 品目・小計・税・割引・合計を抽出 → 合わない場合は読み方を変えて再認識
+        // =====================================================================
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // ---------- カメラ ----------
+        function resetScanView() {
+            document.getElementById('scan-preview').classList.add('hidden');
+            const overlay = document.getElementById('scan-loading-overlay');
+            overlay.classList.add('hidden', 'opacity-0');
+            overlay.classList.remove('flex');
+            setScanStatus('レシートを分析中...', 5);
+        }
+
+        async function startCamera() {
+            resetScanView();
+            const video = document.getElementById('camera-feed');
+            const hint = document.querySelector('#camera-overlay-text p');
+            if (!navigator.mediaDevices?.getUserMedia) { cameraUnavailable(); return; }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1920 } },
+                    audio: false
+                });
+                // カメラ許可を待つ間に画面を離れていたら止める
+                if (!document.getElementById('scan-view').classList.contains('active')) {
+                    stream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+                video.srcObject = stream;
+                state.cameraStream = stream;
+                await video.play().catch(() => {});
+                hint.innerText = 'レシート全体を枠に合わせてください';
+            } catch (err) {
+                console.warn('Camera unavailable', err);
+                cameraUnavailable();
+            }
+        }
+
+        function cameraUnavailable() {
+            const hint = document.querySelector('#camera-overlay-text p');
+            if (hint) hint.innerText = 'カメラを起動できません。スキャンを押すとスマホのカメラが開きます';
+        }
+
+        function stopCamera() {
+            if (state.cameraStream) {
+                state.cameraStream.getTracks().forEach(track => track.stop());
+                state.cameraStream = null;
+                const video = document.getElementById('camera-feed');
+                if (video) video.srcObject = null;
+            }
+        }
+
+        function navTo(viewId) {
+            if (viewId === 'scan-view') {
+                startCamera();
+            } else {
+                stopCamera();
+            }
+
+            if (viewId === 'history-view') {
+                renderHistoryList();
+            }
+
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        function formatMoney(num) {
+            return '₩' + (Number(num) || 0).toLocaleString('en-US');
+        }
+
+        // ---------- 画像の取得 ----------
+        function drawToCanvas(source, w, h, maxSide = 2600) {
+            const scale = Math.min(1, maxSide / Math.max(w, h));
+            const c = document.createElement('canvas');
+            c.width = Math.round(w * scale);
+            c.height = Math.round(h * scale);
+            c.getContext('2d').drawImage(source, 0, 0, c.width, c.height);
+            return c;
+        }
+
+        function flashEffect() {
+            const flash = document.getElementById('camera-flash');
+            flash.classList.replace('opacity-0', 'opacity-100');
+            setTimeout(() => flash.classList.replace('opacity-100', 'opacity-0'), 100);
+        }
+
+        async function captureAndScan() {
+            if (state.scanning) return;
+            const video = document.getElementById('camera-feed');
+            // カメラが使えない場合は OS 標準のカメラで撮影してもらう (こちらの方が高画質)
+            if (!state.cameraStream || !video.videoWidth) {
+                document.getElementById('file-camera').click();
+                return;
+            }
+            flashEffect();
+            const canvas = drawToCanvas(video, video.videoWidth, video.videoHeight);
+            video.pause();
+            await processReceiptCanvas(canvas);
+        }
+
+        function handleImageFile(input) {
+            const file = input.files && input.files[0];
+            input.value = '';
+            if (!file || state.scanning) return;
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = async () => {
+                const canvas = drawToCanvas(img, img.naturalWidth, img.naturalHeight);
+                URL.revokeObjectURL(url);
+                await processReceiptCanvas(canvas);
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); showScanError('画像を読み込めませんでした'); };
+            img.src = url;
+        }
+
+        // ---------- 読み取りの流れ ----------
+        function setScanStatus(text, percent) {
+            document.getElementById('scan-status').innerText = text;
+            if (percent != null) document.getElementById('scan-progress').style.width = Math.min(100, percent) + '%';
+        }
+
+        function showScanOverlay(show) {
+            const overlay = document.getElementById('scan-loading-overlay');
+            if (show) {
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+            } else {
+                overlay.classList.add('opacity-0');
+                setTimeout(() => { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }, 300);
+            }
+        }
+
+        function showScanError(msg) {
+            const hint = document.querySelector('#camera-overlay-text p');
+            if (hint) hint.innerText = msg;
+        }
+
+        function withTimeout(promise, ms, message) {
+            let timer;
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })
+            ]).finally(() => clearTimeout(timer));
+        }
+
+        async function processReceiptCanvas(canvas) {
+            state.scanning = true;
+            const preview = document.getElementById('scan-preview');
+            preview.src = canvas.toDataURL('image/jpeg', 0.85);
+            preview.classList.remove('hidden');
+            setScanStatus('画像を整えています...', 5);
+            showScanOverlay(true);
+
+            let receipt;
+            try {
+                receipt = await recognizeReceipt(canvas);
+                receipt.engine = 'ocr';
+            } catch (err) {
+                console.error('OCR failed', err);
+                receipt = normalizeReceipt({});
+                receipt.notice = `自動読み取りに失敗しました（${err.message}）。明るい場所でレシートを平らにして撮り直すか、内容を手入力してください`;
+            }
+            receipt.image = drawToCanvas(canvas, canvas.width, canvas.height, 360).toDataURL('image/jpeg', 0.6);
+
+            setScanStatus('完了', 100);
+            state.currentReceipt = receipt;
+            showScanOverlay(false);
+            state.scanning = false;
+            setTimeout(() => {
+                populateDynamicData();
+                navTo('payment-view');
+            }, 300);
+        }
+
+        // 読み取り結果を同じ形にそろえる
+        function normalizeReceipt(r) {
+            const int = v => { const n = Math.round(Math.abs(Number(String(v ?? '').replace(/[^\d.-]/g, '')))); return isNaN(n) ? 0 : n; };
+            const items = (r.items || [])
+                .map(i => ({
+                    name: String(i.name || '').trim(),
+                    quantity: int(i.quantity) || 1,
+                    unitPrice: int(i.unitPrice),
+                    amount: int(i.amount ?? i.price)
+                }))
+                .filter(i => i.name || i.amount);
+            items.forEach(i => { if (!i.unitPrice) i.unitPrice = Math.round(i.amount / i.quantity); });
+            const subtotals = (r.subtotals || []).map(s => ({ label: String(s.label || '小計').trim(), amount: int(s.amount) })).filter(s => s.amount);
+            const discount = int(r.discount);
+            const tax = int(r.tax);
+            const itemsSum = items.reduce((a, i) => a + i.amount, 0);
+            const total = int(r.total) || Math.max(0, itemsSum - discount);
+            const iso = normalizeDate(r.date);
+            return {
+                store: String(r.storeName || r.store || '').trim() || '不明な店舗',
+                date: iso ? iso.replace(/-/g, '.') : todayDotted(),
+                category: ['음식', '쇼핑', '교통비', '숙박'].includes(r.category) ? r.category : '음식',
+                paymentMethod: ['card', 'cash', 'wowpass'].includes(r.paymentMethod) ? r.paymentMethod : 'unknown',
+                items, subtotals, discount, tax, total,
+                rawText: r.rawText || ''
+            };
+        }
+
+        // ---------- OCRエンジン (Tesseract.js) ----------
+        let tesseractWorkerPromise = null;
+        const ocrProgress = { base: 10, span: 30, label: '' };
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('OCRライブラリを読み込めません。ネット接続を確認してください'));
+                document.head.appendChild(s);
+            });
+        }
+
+        function getTesseractWorker() {
+            if (!tesseractWorkerPromise) {
+                tesseractWorkerPromise = withTimeout((async () => {
+                    if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@6/dist/tesseract.min.js');
+                    return Tesseract.createWorker(['kor', 'eng'], 1, {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                setScanStatus(`文字を認識中... ${ocrProgress.label}`, ocrProgress.base + Math.round((m.progress || 0) * ocrProgress.span));
+                            } else if (m.status) {
+                                setScanStatus('OCRを準備中...（初回のみ韓国語データをダウンロード）', 10 + Math.round((m.progress || 0) * 20));
+                            }
+                        }
+                    });
+                })(), 120000, 'OCRの準備がタイムアウトしました。通信環境を確認してください')
+                    .catch(err => { tesseractWorkerPromise = null; throw err; });
+            }
+            return tesseractWorkerPromise;
+        }
+
+        // ---------- 画像の前処理 ----------
+        function toGray(canvas) {
+            const { width: w, height: h } = canvas;
+            const d = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+            const g = new Uint8ClampedArray(w * h);
+            for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+            return { g, w, h };
+        }
+
+        function grayToCanvas(g, w, h) {
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const ctx = c.getContext('2d');
+            const img = ctx.createImageData(w, h);
+            for (let i = 0, j = 0; j < g.length; i += 4, j++) { img.data[i] = img.data[i + 1] = img.data[i + 2] = g[j]; img.data[i + 3] = 255; }
+            ctx.putImageData(img, 0, 0);
+            return c;
+        }
+
+        function otsuThreshold(values) {
+            const hist = new Array(256).fill(0);
+            for (const v of values) hist[v]++;
+            const total = values.length;
+            let sum = 0;
+            for (let i = 0; i < 256; i++) sum += i * hist[i];
+            let sumB = 0, wB = 0, best = 0, threshold = 127;
+            for (let t = 0; t < 256; t++) {
+                wB += hist[t]; if (!wB) continue;
+                const wF = total - wB; if (!wF) break;
+                sumB += t * hist[t];
+                const mB = sumB / wB, mF = (sum - sumB) / wF;
+                const between = wB * wF * (mB - mF) ** 2;
+                if (between > best) { best = between; threshold = t; }
+            }
+            return threshold;
+        }
+
+        // 最も長く「明るい(=紙)」が続く範囲。少しの途切れ(影・文字)は許容
+        function longestBrightRun(fracs, minFrac) {
+            const maxGap = Math.max(2, Math.round(fracs.length * 0.03));
+            let best = [0, -1], start = -1, last = -1;
+            fracs.forEach((f, i) => {
+                if (f >= minFrac) {
+                    if (start < 0 || i - last > maxGap) start = i;
+                    last = i;
+                    if (last - start > best[1] - best[0]) best = [start, last];
+                }
+            });
+            return best;
+        }
+
+        // 背景(机など)を除き、白いレシート部分だけを切り出す
+        function findReceiptBox(canvas) {
+            const { g, w, h } = toGray(canvas);
+            const step = Math.max(1, Math.floor(Math.max(w, h) / 300));
+            const sw = Math.floor(w / step), sh = Math.floor(h / step);
+            const small = new Uint8ClampedArray(sw * sh);
+            for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) small[y * sw + x] = g[(y * step) * w + x * step];
+            const t = otsuThreshold(small);
+            const cols = new Array(sw).fill(0);
+            for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) if (small[y * sw + x] > t) cols[x]++;
+            const [c0, c1] = longestBrightRun(cols.map(v => v / sh), 0.45);
+            if (c1 <= c0) return null;
+            const rows = new Array(sh).fill(0);
+            for (let y = 0; y < sh; y++) for (let x = c0; x <= c1; x++) if (small[y * sw + x] > t) rows[y]++;
+            const [r0, r1] = longestBrightRun(rows.map(v => v / (c1 - c0 + 1)), 0.5);
+            if (r1 <= r0) return null;
+            const mx = Math.round(sw * 0.015), my = Math.round(sh * 0.015);
+            const box = {
+                x: Math.max(0, (c0 - mx) * step), y: Math.max(0, (r0 - my) * step),
+                w: Math.min(w, (c1 + mx + 1) * step) - Math.max(0, (c0 - mx) * step),
+                h: Math.min(h, (r1 + my + 1) * step) - Math.max(0, (r0 - my) * step)
+            };
+            const ratio = (box.w * box.h) / (w * h);
+            return (ratio > 0.12 && ratio < 0.95) ? box : null;
+        }
+
+        // 切り出し → 文字が読みやすい大きさに拡大縮小 → 白黒化(影に強い局所しきい値)
+        function prepareOcrImages(canvas) {
+            const box = findReceiptBox(canvas) || { x: 0, y: 0, w: canvas.width, h: canvas.height };
+            // レシート幅 1500px 前後が Tesseract に最適 (1文字 ≒ 25〜35px)。メモリ保護のため 450万画素まで
+            let scale = Math.min(2.5, Math.max(1300, Math.min(1800, box.w)) / box.w);
+            scale = Math.min(scale, Math.sqrt(4.5e6 / (box.w * box.h)));
+            const w = Math.max(1, Math.round(box.w * scale)), h = Math.max(1, Math.round(box.h * scale));
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const ctx = c.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(canvas, box.x, box.y, box.w, box.h, 0, 0, w, h);
+            const { g } = toGray(c);
+
+            // コントラスト強調 (上下1%を切り捨てて引き伸ばす)
+            const hist = new Array(256).fill(0);
+            for (const v of g) hist[v]++;
+            let lo = 0, hi = 255, acc = 0;
+            for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc > g.length * 0.01) { lo = v; break; } }
+            acc = 0;
+            for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc > g.length * 0.01) { hi = v; break; } }
+            const range = Math.max(1, hi - lo);
+            for (let i = 0; i < g.length; i++) g[i] = Math.max(0, Math.min(255, (g[i] - lo) * 255 / range));
+
+            // 局所しきい値 (Bradley法): 影や照明ムラがあっても文字だけ黒く残る
+            const integral = new Uint32Array((w + 1) * (h + 1));
+            for (let y = 1; y <= h; y++) {
+                let rowSum = 0;
+                for (let x = 1; x <= w; x++) {
+                    rowSum += g[(y - 1) * w + (x - 1)];
+                    integral[y * (w + 1) + x] = integral[(y - 1) * (w + 1) + x] + rowSum;
+                }
+            }
+            const s = Math.max(15, Math.round(w / 14)), half = s >> 1, T = 0.15;
+            const bin = new Uint8ClampedArray(w * h);
+            for (let y = 0; y < h; y++) {
+                const y0 = Math.max(0, y - half), y1 = Math.min(h - 1, y + half);
+                for (let x = 0; x < w; x++) {
+                    const x0 = Math.max(0, x - half), x1 = Math.min(w - 1, x + half);
+                    const count = (x1 - x0 + 1) * (y1 - y0 + 1);
+                    const sum = integral[(y1 + 1) * (w + 1) + (x1 + 1)] - integral[y0 * (w + 1) + (x1 + 1)]
+                              - integral[(y1 + 1) * (w + 1) + x0] + integral[y0 * (w + 1) + x0];
+                    bin[y * w + x] = g[y * w + x] * count <= sum * (1 - T) ? 0 : 255;
+                }
+            }
+            // 端の黒いノイズを消し、周りに白い余白を付ける (Tesseract は余白がある方が安定)
+            const edge = Math.round(w * 0.01);
+            for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+                if (x < edge || y < edge || x >= w - edge || y >= h - edge) bin[y * w + x] = 255;
+            }
+            const pad = c2 => {
+                const p = document.createElement('canvas');
+                p.width = c2.width + 40; p.height = c2.height + 40;
+                const pc = p.getContext('2d');
+                pc.fillStyle = '#fff'; pc.fillRect(0, 0, p.width, p.height);
+                pc.drawImage(c2, 20, 20);
+                return p;
+            };
+            return { binary: pad(grayToCanvas(bin, w, h)), gray: pad(grayToCanvas(g, w, h)), cropped: box.w !== canvas.width || box.h !== canvas.height };
+        }
+
+        // ---------- 認識 (結果が合わなければ読み方を変えて最大3回) ----------
+        function scoreParsed(p) {
+            const near = (a, b) => Math.abs(a - b) <= 1;
+            const sum = p.items.reduce((a, i) => a + i.amount, 0);
+            const balanced = p.items.length > 0 && p.total > 0 &&
+                (near(sum - p.discount, p.total) || near(sum - p.discount + p.tax, p.total));
+            let s = 0;
+            if (p.total) s += 3;
+            if (p.items.length) s += 2;
+            if (balanced) s += 5;
+            if (p.subtotals.some(st => near(st.amount, sum) || near(st.amount, p.total))) s += 1;
+            if (p.date) s += 1;
+            if (p.storeName) s += 1;
+            return { score: s, balanced };
+        }
+
+        async function recognizeReceipt(canvas) {
+            setScanStatus('OCRを準備中...', 8);
+            const worker = await getTesseractWorker();
+            setScanStatus('画像を整えています...', 32);
+            await new Promise(r => setTimeout(r, 20)); // 表示を更新してから重い処理へ
+            const imgs = prepareOcrImages(canvas);
+
+            const passes = [
+                { image: imgs.binary, psm: '6' },  // 1つの文章ブロックとして
+                { image: imgs.binary, psm: '4' },  // 1列・行ごとに大きさが違う文書として
+                { image: imgs.gray, psm: '6' }     // 白黒化しない画像で
+            ];
+            let best = null;
+            for (let i = 0; i < passes.length; i++) {
+                ocrProgress.label = passes.length > 1 && i > 0 ? `(精度アップのため再試行 ${i + 1}/${passes.length})` : '';
+                ocrProgress.base = 35 + i * 20;
+                ocrProgress.span = 20;
+                await worker.setParameters({ tessedit_pageseg_mode: passes[i].psm, preserve_interword_spaces: '1', user_defined_dpi: '300' });
+                const { data } = await withTimeout(worker.recognize(passes[i].image), 90000, '文字認識がタイムアウトしました');
+                const text = data.text || '';
+                if (!text.trim()) continue;
+                const parsed = parseKoreanReceipt(text);
+                const { score, balanced } = scoreParsed(parsed);
+                if (!best || score > best.score) best = { parsed, text, score, balanced };
+                if (balanced && parsed.date) break; // 合計まで合っていれば十分
+            }
+            setScanStatus('データを整理中...', 97);
+            if (!best || (!best.parsed.total && !best.parsed.items.length)) {
+                throw new Error(best ? '金額を検出できませんでした' : '文字を検出できませんでした');
+            }
+            return normalizeReceipt({ ...best.parsed, rawText: best.text });
+        }
+
+        // ---------- 韓国のレシート文字列 → 構造化データ ----------
+        // OCR がよく間違える文字も拾えるよう、キーワードは揺れを許容 (계/게/개, 액/엑 など)
+        const RX = {
+            exclude: /(받은금[액엑]|받은돈|거스름|잔돈|승인번호|승인일시|카드번호|사업자|등록번호|전화|TEL|주소|대표자?|포인트|적립|가맹점번호|단말기|POS|영수증번호|거래번호|일련번호|할부|유효기간|계산원|캐셔|담당)/i,
+            subtotal: /(소[계게개]|SUBTOTAL|SUB-TOTAL|공급가[액엑]?|과세물품가?[액엑]?|면세물품가?[액엑]?|과세금[액엑]|면세금[액엑])/i,
+            tax: /(부가[세서]|부가가치[세서]|VAT|세[액엑])/i,
+            discount: /(할인|D\/?C|쿠폰)/i,
+            totalStrong: /(총?결[제재]금[액엑]|받을금[액엑]|청구금[액엑]|총합[계게개]|결[제재]합[계게개])/i,
+            totalMid: /(합[계게개]금[액엑]|총금[액엑]|총[액엑]|판매합[계게개])/i,
+            totalWeak: /(합[계게개]|함[계게]|TOTAL|판매금[액엑])/i,
+            header: /^(상품명|품명|품목|메뉴|단가|수량|금[액엑]|가격|QTY|PRICE|ITEM|AMOUNT|[\s\-=*_.:|]+)+$/i,
+            headerWord: /(상품명|품명|품목|메뉴|단가|수량|금[액엑]|가격|QTY|PRICE|ITEM|AMOUNT)/gi,
+            date: /(?<!\d)(20\d{2}|\d{2})\s*[.\-\/년]\s*(0?[1-9]|1[0-2])\s*[.\-\/월]\s*(0?[1-9]|[12]\d|3[01])(?!\d)/,
+            time: /(?<!\d)([01]?\d|2[0-3])\s*:\s*[0-5]\d/,
+            // 単独の数字だけを金額とみなす ("2L" や "5입" の数字は品名の一部)。"1 ,200" のような OCR の空白も許容
+            amountToken: /(?<![0-9A-Za-z가-힣])-?\d{1,3}(?:\s?[,.]\s?\d{3})+(?![0-9A-Za-z가-힣])|(?<![0-9A-Za-z가-힣,.])-?\d+(?![0-9A-Za-z가-힣])/g,
+            address: /\S+[시도]\s?\S+[구군]\s?\S*(로|길|동)|\S+(로|길)\s?\d+/,
+            storeLabel: /(상호|가맹점명?|매장명|점포명|상점명)\s*[:：]?\s*(.+)/
+        };
+
+        // OCR の誤認識を修正: 数字の隣の O→0, l/I/|→1, 全角記号→半角 など
+        function normalizeOcrLine(line) {
+            let s = line.normalize('NFKC')
+                .replace(/[，､]/g, ',').replace(/[．。]/g, '.').replace(/[－—–―]/g, '-').replace(/[：]/g, ':')
+                .replace(/[￦]/g, '₩').replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0));
+            for (let k = 0; k < 3; k++) {
+                s = s.replace(/([\d,.])[Oo]|[Oo](?=[\d,.]\d)/g, m => m.replace(/[Oo]/, '0'))
+                     .replace(/([\d,.])[Il|]|[Il|](?=[\d,.]\d)/g, m => m.replace(/[Il|]/, '1'));
+            }
+            // "8,0 00" のように桁の途中に入った空白を詰める
+            s = s.replace(/(\d)[,.]\s(\d)\s(\d{1,2})(?!\d)/g, (m, a, b, c) => (b + c).length === 3 ? `${a},${b}${c}` : m);
+            return s.replace(/\s+/g, ' ').trim();
+        }
+
+        // 背景の模様などを文字と誤認した「ゴミ行」か
+        function isNoiseLine(line) {
+            const c = line.replace(/\s+/g, '');
+            // 「부 가 세」「합 계」のように字間を空けて印字されるラベルは正しい行
+            if (RX.subtotal.test(c) || RX.tax.test(c) || RX.discount.test(c) || RX.totalStrong.test(c) || RX.totalMid.test(c) || RX.totalWeak.test(c)) return false;
+            const tokens = line.split(/\s+/).filter(Boolean);
+            const hangul = (line.match(/[가-힣]/g) || []).length;
+            const meaningful = (line.match(/[가-힣A-Za-z0-9]/g) || []).length;
+            if (meaningful < line.replace(/\s/g, '').length * 0.6) return true;           // 記号だらけ
+            if (tokens.length >= 4 && tokens.filter(t => t.length <= 2).length / tokens.length > 0.6 && hangul < 4) return true;
+            if (hangul < 2 && (line.match(/\b[A-Za-z]{1,4}\b/g) || []).length >= 5) return true; // 意味のない英字の羅列
+            return false;
+        }
+
+        function cleanName(name) {
+            return name.replace(/[^가-힣A-Za-z0-9 .,%()\/+&'\-]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function amountsIn(line) {
+            const s = line.replace(/[₩\\]/g, ' ').replace(/원/g, ' ');
+            return (s.match(RX.amountToken) || []).map(t => parseInt(t.replace(/[,.\s]/g, ''), 10)).filter(n => !isNaN(n));
+        }
+
+        function stripNumbers(line) {
+            return line.replace(/[₩\\]/g, ' ').replace(/(\d)\s*원/g, '$1 ')
+                .replace(RX.amountToken, ' ')
+                .replace(/[*#@:|\[\]<>()]/g, ' ')
+                .split(/\s+/).filter(t => t && !/^[-,.=_~'"`]+$/.test(t)).join(' ').trim();
+        }
+
+        function guessCategory(text) {
+            if (/(호텔|모텔|게스트하우스|숙박|스테이|HOTEL|HOSTEL|INN)/i.test(text)) return '숙박';
+            if (/(택시|지하철|버스|교통|코레일|KTX|SRT|티머니|T-?MONEY|주유|공항철도)/i.test(text)) return '교통비';
+            if (/(올리브영|다이소|백화점|면세|화장품|의류|아울렛|쇼핑|문구|서점|무신사)/i.test(text)) return '쇼핑';
+            return '음식';
+        }
+
+        function parseKoreanReceipt(text) {
+            const lines = text.split(/\r?\n/).map(normalizeOcrLine).filter(l => l && !/^[\s\-=*_.~|]+$/.test(l) && !isNoiseLine(l));
+            const compact = l => l.replace(/\s+/g, '');
+            const hasLetters = l => /[가-힣]|[A-Za-z]{2,}/.test(stripNumbers(l));
+            const isSummary = l => {
+                const c = compact(l);
+                return RX.subtotal.test(c) || RX.tax.test(c) || RX.totalStrong.test(c) || RX.totalMid.test(c) || RX.totalWeak.test(c);
+            };
+            const lineAmount = i => {
+                const nums = amountsIn(lines[i]).map(Math.abs);
+                if (nums.length) return nums[nums.length - 1];
+                // 「합계」の金額が次の行に印字されている場合
+                const next = lines[i + 1] || '';
+                if (!/[가-힣A-Za-z]/.test(next.replace(/원/g, ''))) { const n = amountsIn(next).map(Math.abs); if (n.length) return n[n.length - 1]; }
+                return 0;
+            };
+
+            // 日付
+            let date = '';
+            for (const l of lines) {
+                const m = l.match(RX.date);
+                if (m) { date = `${m[1].length === 2 ? '20' + m[1] : m[1]}.${m[2].padStart(2, '0')}.${m[3].padStart(2, '0')}`; break; }
+            }
+
+            // 店名
+            let storeName = '';
+            for (const l of lines) {
+                const m = l.match(RX.storeLabel);
+                if (m) { storeName = stripNumbers(m[2].replace(RX.date, '')).trim(); if (storeName) break; }
+            }
+            if (!storeName) {
+                for (const l of lines.slice(0, 6)) {
+                    const cleaned = l.replace(/[\[\]<>【】()*=\-_|]/g, ' ').replace(/\s+/g, ' ').trim();
+                    const digits = (cleaned.match(/\d/g) || []).length;
+                    if (/[가-힣]{2,}|[A-Z0-9]{2,}[A-Za-z]{2,}/.test(cleaned) && digits < 6 && !RX.exclude.test(compact(l)) && !RX.date.test(l) && !isSummary(l) && !/영수증|RECEIPT|감사합니다|WELCOME/i.test(l)) {
+                        storeName = cleanName(cleaned); break;
+                    }
+                }
+            }
+
+            // 支払い方法 (除外行も含めて判定)
+            const all = compact(text);
+            const paymentMethod = /(WOWPASS|와우패스)/i.test(all) ? 'wowpass'
+                : /(신용|카드|CARD|VISA|MASTER|승인)/i.test(all) ? 'card'
+                : /(현금|CASH)/i.test(all) ? 'cash' : 'unknown';
+
+            // 小計・税・割引・合計
+            const subtotals = [];
+            let tax = 0, discount = 0, total = 0, totalRank = 0;
+            let firstSummaryIdx = lines.length;
+            lines.forEach((l, i) => {
+                const c = compact(l);
+                if (RX.exclude.test(c)) return;
+                if (RX.subtotal.test(c)) {
+                    firstSummaryIdx = Math.min(firstSummaryIdx, i);
+                    const amount = lineAmount(i);
+                    if (amount) subtotals.push({ label: stripNumbers(l) || '小計', amount });
+                } else if (RX.tax.test(c)) {
+                    firstSummaryIdx = Math.min(firstSummaryIdx, i);
+                    tax = lineAmount(i) || tax;
+                } else {
+                    const rank = RX.totalStrong.test(c) ? 3 : RX.totalMid.test(c) ? 2 : RX.totalWeak.test(c) ? 1 : 0;
+                    if (rank) {
+                        firstSummaryIdx = Math.min(firstSummaryIdx, i);
+                        const amount = lineAmount(i);
+                        if (amount && rank >= totalRank) { total = amount; totalRank = rank; }
+                    }
+                }
+            });
+
+            // 明細の開始位置: 「상품명 단가 수량 금액」の見出し行、または日付行の次から
+            let itemStart = 0;
+            lines.slice(0, firstSummaryIdx).forEach((l, i) => {
+                const headerWords = (l.match(RX.headerWord) || []).length;
+                if (headerWords >= 2 || RX.date.test(l)) itemStart = i + 1;
+            });
+
+            // 明細 (見出し〜小計・合計の間の行)
+            const items = [];
+            let pendingName = '';   // 品名と金額が2行に分かれて印字されるレシート用
+            lines.slice(itemStart, firstSummaryIdx).forEach(l => {
+                const c = compact(l);
+                if (RX.exclude.test(c) || RX.header.test(l) || RX.date.test(l) || RX.time.test(l) || RX.address.test(l) || isSummary(l)) { pendingName = ''; return; }
+                const nums = amountsIn(l);
+                if (!nums.length) { pendingName = hasLetters(l) ? cleanName(stripNumbers(l)) : ''; return; }
+                const amount = Math.abs(nums[nums.length - 1]);
+                if (RX.discount.test(c) || (nums[nums.length - 1] < 0 && items.length)) { discount += amount; pendingName = ''; return; }
+                // 直前までの品目の合計と同じ金額 → ラベルが読めなくても「소계」とみなす
+                const runningSum = items.reduce((a, it) => a + it.amount, 0);
+                if (items.length >= 2 && amount === runningSum) {
+                    const label = cleanName(stripNumbers(l));
+                    if (!subtotals.some(st => st.amount === amount)) subtotals.unshift({ label: /[가-힣]{2,}/.test(label) ? label : '소계', amount });
+                    pendingName = '';
+                    return;
+                }
+                let name = cleanName(stripNumbers(l));
+                if (!/[가-힣]|[A-Za-z]{2,}/.test(name)) { name = pendingName; }
+                pendingName = '';
+                if (!name || name === storeName) return;
+                if (amount < 10) return; // 数量だけの行
+                let quantity = 1, unitPrice = amount;
+                const rest = nums.slice(0, -1).map(Math.abs);
+                for (const q of rest) {
+                    if (q < 1 || q > 99) continue;
+                    const u = rest.find(v => v !== q && v * q === amount);
+                    if (u) { quantity = q; unitPrice = u; break; }
+                    if (q > 1 && amount % q === 0 && rest.includes(amount / q)) { quantity = q; unitPrice = amount / q; break; }
+                }
+                items.push({ name, quantity, unitPrice, amount });
+            });
+            // 合計行の後ろにある割引行
+            lines.slice(firstSummaryIdx).forEach(l => {
+                const c = compact(l);
+                if (!RX.exclude.test(c) && RX.discount.test(c) && !isSummary(l)) {
+                    const n = amountsIn(l).map(Math.abs); if (n.length) discount += n[n.length - 1];
+                }
+            });
+
+            if (!total && items.length) total = Math.max(0, items.reduce((a, i) => a + i.amount, 0) - discount);
+
+            return {
+                storeName, date, paymentMethod, items, subtotals, tax, discount, total,
+                category: guessCategory(storeName + ' ' + items.map(i => i.name).join(' '))
+            };
+        }
+
+        // ---------- 確認画面 ----------
+        function itemRowHtml(item = {}) {
+            return `
+                <div class="flex items-center gap-2">
+                    <input type="text" class="item-name flex-1 min-w-0 text-body font-medium bg-transparent border-none outline-none focus:text-action" placeholder="品名" value="${esc(item.name)}">
+                    <input type="number" class="item-qty w-10 text-body text-center text-muted bg-parchment rounded-md border-none outline-none" value="${esc(item.quantity || 1)}" oninput="updateConfirmCheck()">
+                    <input type="number" class="item-amount w-24 text-body font-medium text-right bg-transparent border-none outline-none focus:text-action" placeholder="0" value="${esc(item.amount || '')}" oninput="updateConfirmCheck()">
+                    <button class="text-muted px-1 active:opacity-50" onclick="this.closest('.item-row').remove(); updateConfirmCheck()">×</button>
+                </div>
+                ${item.nameJa ? `<p class="text-nav text-muted mt-1">${esc(item.nameJa)}</p>` : ''}`;
+        }
+
+        function addItemRow(item) {
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.dataset.nameJa = (item && item.nameJa) || '';
+            row.innerHTML = itemRowHtml(item);
+            document.getElementById('confirm-items-container').appendChild(row);
+            updateConfirmCheck();
+        }
+
+        function addSubtotalRow(sub = {}) {
+            const row = document.createElement('div');
+            row.className = 'subtotal-row flex items-center gap-2';
+            row.innerHTML = `
+                <input type="text" class="sub-label flex-1 min-w-0 text-body bg-transparent border-none outline-none focus:text-action" placeholder="소계" value="${esc(sub.label)}">
+                <input type="number" class="sub-amount w-28 text-body font-medium text-right bg-transparent border-none outline-none focus:text-action" placeholder="0" value="${esc(sub.amount || '')}" oninput="updateConfirmCheck()">
+                <button class="text-muted px-1 active:opacity-50" onclick="this.closest('.subtotal-row').remove(); updateConfirmCheck()">×</button>`;
+            document.getElementById('confirm-subtotals-container').appendChild(row);
+            updateConfirmCheck();
+        }
+
+        function readConfirmForm() {
+            const num = v => Math.abs(parseInt(v, 10)) || 0;
+            const items = [...document.querySelectorAll('#confirm-items-container .item-row')].map(row => ({
+                name: row.querySelector('.item-name').value.trim(),
+                nameJa: row.dataset.nameJa || '',
+                quantity: num(row.querySelector('.item-qty').value) || 1,
+                amount: num(row.querySelector('.item-amount').value)
+            })).filter(i => i.name || i.amount);
+            items.forEach(i => { i.unitPrice = Math.round(i.amount / i.quantity); });
+            const subtotals = [...document.querySelectorAll('#confirm-subtotals-container .subtotal-row')].map(row => ({
+                label: row.querySelector('.sub-label').value.trim() || '小計',
+                amount: num(row.querySelector('.sub-amount').value)
+            })).filter(s => s.amount);
+            return {
+                items, subtotals,
+                discount: num(document.getElementById('confirm-discount').value),
+                tax: num(document.getElementById('confirm-tax').value),
+                total: num(document.getElementById('confirm-total').value)
+            };
+        }
+
+        // 明細の合計と「合計」が合っているかを確認して表示
+        function updateConfirmCheck() {
+            const el = document.getElementById('confirm-check');
+            if (!el) return;
+            const f = readConfirmForm();
+            const itemsSum = f.items.reduce((a, i) => a + i.amount, 0);
+            const near = (a, b) => Math.abs(a - b) <= 1;
+            let msg, ok;
+            if (!f.items.length) { msg = '明細なし — 合計のみ記録します'; ok = null; }
+            else if (near(itemsSum - f.discount, f.total)) { msg = '✓ 明細の合計と一致しています'; ok = true; }
+            else if (f.tax && near(itemsSum - f.discount + f.tax, f.total)) { msg = '✓ 明細＋税 = 合計 で一致しています'; ok = true; }
+            else {
+                msg = `⚠ 明細の合計 ${formatMoney(itemsSum - f.discount)} と合計 ${formatMoney(f.total)} が ${formatMoney(Math.abs(itemsSum - f.discount - f.total))} 違います。写真と見比べてください`;
+                ok = false;
+            }
+            if (f.items.length && f.subtotals.some(s => near(s.amount, itemsSum))) msg += '（小計とも一致）';
+            el.innerText = msg;
+            el.style.color = ok === true ? '#248a3d' : ok === false ? '#ff3b30' : '#7a7a7a';
+        }
+
+        function populateDynamicData() {
+            const receipt = state.currentReceipt;
+            if (!receipt) return;
+
+            document.getElementById('payment-store-name').innerText = receipt.store;
+            document.getElementById('payment-total-amount').innerText = formatMoney(receipt.total);
+            const notice = document.getElementById('payment-mock-notice');
+            notice.innerText = receipt.notice || '';
+            notice.classList.toggle('hidden', !receipt.notice);
+
+            // レシートから支払い方法が読めたら初期選択にする
+            const method = ['cash', 'card', 'wowpass'].includes(receipt.paymentMethod) ? receipt.paymentMethod : 'cash';
+            const radio = document.querySelector(`input[name="payment"][value="${method}"]`);
+            if (radio) radio.checked = true;
+            updateRadioUI(method);
+
+            document.getElementById('confirm-date').value = receipt.date || '';
+            document.getElementById('confirm-store').value = receipt.store || '';
+            document.getElementById('confirm-category').value = receipt.category || '음식';
+            document.getElementById('confirm-total').value = receipt.total || 0;
+            document.getElementById('confirm-discount').value = receipt.discount || '';
+            document.getElementById('confirm-tax').value = receipt.tax || '';
+
+            const box = document.getElementById('confirm-receipt-box');
+            box.classList.toggle('hidden', !receipt.image);
+            if (receipt.image) document.getElementById('confirm-receipt-img').src = receipt.image;
+            document.getElementById('confirm-engine').innerText = receipt.engine ? '読み取り: 端末内OCR' : '手入力';
+            const rawBox = document.getElementById('confirm-raw-box');
+            rawBox.classList.toggle('hidden', !receipt.rawText);
+            rawBox.open = false;
+            document.getElementById('confirm-raw').textContent = receipt.rawText || '';
+            const cNotice = document.getElementById('confirm-notice');
+            cNotice.innerText = receipt.notice || '';
+            cNotice.classList.toggle('hidden', !receipt.notice);
+
+            document.getElementById('confirm-items-container').innerHTML = '';
+            document.getElementById('confirm-subtotals-container').innerHTML = '';
+            (receipt.items || []).forEach(item => addItemRow(item));
+            (receipt.subtotals || []).forEach(sub => addSubtotalRow(sub));
+            updateConfirmCheck();
+
+            document.getElementById('payment-total-jpy').innerText = '≈ ¥—';
+            document.getElementById('payment-rate-info').innerText = '為替レート取得中...';
+            showYen(receipt.total || 0, receipt.date, 'payment-total-jpy', 'payment-rate-info');
+            refreshConfirmYen();
+        }
+
+        function updateRadioUI(selectedMethod) {
+            state.pendingPaymentMethod = selectedMethod;
+            
+            const methods = ['cash', 'wowpass', 'card'];
+            methods.forEach(method => {
+                const indicator = document.getElementById(`radio-${method}`);
+                const container = indicator.parentElement;
+                
+                if (method === selectedMethod) {
+                    indicator.classList.remove('bg-transparent');
+                    indicator.classList.add('bg-action');
+                    container.classList.remove('border-hairline');
+                    container.classList.add('border-action');
+                } else {
+                    indicator.classList.add('bg-transparent');
+                    indicator.classList.remove('bg-action');
+                    container.classList.add('border-hairline');
+                    container.classList.remove('border-action');
+                }
+            });
+        }
+
+        async function finalizeTransaction() {
+            if (!state.currentReceipt || state.saving) return;
+            state.saving = true;
+            try { await finalizeTransactionInner(); } finally { state.saving = false; }
+        }
+
+        async function finalizeTransactionInner() {
+            const f = readConfirmForm();
+            const newTx = {
+                store: document.getElementById('confirm-store').value,
+                category: document.getElementById('confirm-category').value,
+                method: state.pendingPaymentMethod,
+                date: document.getElementById('confirm-date').value,
+                total: f.total || state.currentReceipt.total || 0,
+                items: f.items,
+                subtotals: f.subtotals,
+                discount: f.discount,
+                tax: f.tax,
+                image: state.currentReceipt.image || null,
+                engine: state.currentReceipt.engine || null
+            };
+
+            await attachRate(newTx);
+            state.transactions.push(newTx);
+            saveTransactions();
+            recalculateTotals();
+
+            state.currentReceipt = null;
+            navTo('dashboard-view');
+            updateRadioUI('cash');
+        }
+
+        function recalculateTotals() {
+            state.total = 0;
+            state.cash = 0;
+            state.wowpass = 0;
+            state.card = 0;
+            state.categories = { 음식: 0, 쇼핑: 0, 교통비: 0, 숙박: 0 };
+            // 円換算は各取引の「決済日レート」で計算した金額を合算
+            const yen = { total: 0, cash: 0, wowpass: 0, card: 0, 음식: 0, 쇼핑: 0, 교통비: 0, 숙박: 0 };
+
+            state.transactions.forEach(tx => {
+                const j = tx.jpy || 0;
+                state.total += tx.total;
+                yen.total += j;
+                if (state[tx.method] !== undefined) {
+                    state[tx.method] += tx.total;
+                    yen[tx.method] += j;
+                }
+                if (state.categories[tx.category] !== undefined) {
+                    state.categories[tx.category] += tx.total;
+                    yen[tx.category] += j;
+                }
+            });
+
+            const setYen = (id, v) => { document.getElementById(id).innerText = '≈ ' + formatYen(v); };
+            setYen('dash-total-jpy', yen.total);
+            setYen('dash-cash-jpy', yen.cash);
+            setYen('dash-wowpass-jpy', yen.wowpass);
+            setYen('dash-card-jpy', yen.card);
+            setYen('cat-food-jpy', yen['음식']);
+            setYen('cat-shopping-jpy', yen['쇼핑']);
+            setYen('cat-transport-jpy', yen['교통비']);
+            setYen('cat-accommodation-jpy', yen['숙박']);
+
+            document.getElementById('dash-total').innerText = formatMoney(state.total);
+            document.getElementById('dash-cash').innerText = formatMoney(state.cash);
+            document.getElementById('dash-wowpass').innerText = formatMoney(state.wowpass);
+            document.getElementById('dash-card').innerText = formatMoney(state.card);
+
+            document.getElementById('cat-food').innerText = formatMoney(state.categories['음식']);
+            document.getElementById('cat-shopping').innerText = formatMoney(state.categories['쇼핑']);
+            document.getElementById('cat-transport').innerText = formatMoney(state.categories['교통비']);
+            document.getElementById('cat-accommodation').innerText = formatMoney(state.categories['숙박']);
+        }
+
+        function renderHistoryList() {
+            const container = document.getElementById('history-list-container');
+            const emptyEl = document.getElementById('history-empty');
+            container.innerHTML = '';
+
+            if (state.transactions.length === 0) {
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            emptyEl.classList.add('hidden');
+            state.transactions.forEach((tx, idx) => {
+                const methodNames = { cash: '現金', wowpass: 'WOWPASS', card: 'クレジット' };
+                const card = document.createElement('div');
+                card.className = 'bg-canvas border border-hairline rounded-apple p-4 flex justify-between items-center cursor-pointer active:bg-parchment transition-colors';
+                card.onclick = () => openEditView(idx);
+                card.innerHTML = `
+                    <div class="flex items-center gap-3 min-w-0">
+                        ${tx.image ? `<img src="${tx.image}" class="w-11 h-14 object-cover rounded-md border border-hairline flex-shrink-0" alt="">` : ''}
+                        <div class="min-w-0">
+                            <p class="text-caption text-muted">${esc(tx.date)} · ${methodNames[tx.method] || esc(tx.method)}</p>
+                            <p class="text-strong text-lg mt-0.5 truncate">${esc(tx.store)}</p>
+                            <span class="inline-block bg-parchment text-caption px-2 py-0.5 rounded-md mt-1 text-muted">${esc(tx.category)}${tx.items && tx.items.length ? ` · ${tx.items.length}品目` : ''}</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-strong text-lg">${formatMoney(tx.total)}</p>
+                        <p class="text-caption text-muted">${tx.jpy != null ? '≈ ' + formatYen(tx.jpy) : '≈ ¥—'}</p>
+                        <p class="text-nav text-muted mt-0.5">${tx.rate ? '₩1,000=' + formatYen(tx.rate * 1000) : ''}</p>
+                        <p class="text-caption text-action mt-1">編集 〉</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function openEditView(index) {
+            const tx = state.transactions[index];
+            document.getElementById('edit-index').value = index;
+            document.getElementById('edit-date').value = tx.date;
+            document.getElementById('edit-store').value = tx.store;
+            document.getElementById('edit-method').value = tx.method;
+            document.getElementById('edit-category').value = tx.category;
+            document.getElementById('edit-total').value = tx.total;
+            refreshEditYen();
+
+            navTo('edit-view');
+        }
+
+        async function saveEditedTransaction() {
+            const index = parseInt(document.getElementById('edit-index').value, 10);
+            if (isNaN(index) || !state.transactions[index]) return;
+            const tx = state.transactions[index];
+
+            state.transactions[index].date = document.getElementById('edit-date').value;
+            state.transactions[index].store = document.getElementById('edit-store').value;
+            state.transactions[index].method = document.getElementById('edit-method').value;
+            state.transactions[index].category = document.getElementById('edit-category').value;
+            state.transactions[index].total = parseInt(document.getElementById('edit-total').value, 10) || 0;
+
+            await attachRate(tx); // 日付・金額が変わったら決済日レートで再計算
+            saveTransactions();
+            recalculateTotals();
+            navTo('history-view');
+        }
+
+        function deleteTransaction() {
+            const index = parseInt(document.getElementById('edit-index').value, 10);
+            if (isNaN(index) || !state.transactions[index]) return;
+
+            state.transactions.splice(index, 1);
+            saveTransactions();
+            recalculateTotals();
+            navTo('history-view');
+        }
+        // 起動時: 保存済みデータを復元し、今日の参考レートを表示
+        loadTransactions();
+        updateTodayRate();
+    </script>
+</body>
+</html>
